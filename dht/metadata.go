@@ -180,28 +180,30 @@ func requestMetadataPiece(conn net.Conn, utMetadataID int, piece int) error {
 
 	// Create the request payload
 	request := map[string]interface{}{
-		"msg_type": 0, // Requesting a piece
+		"msg_type": 0,  // Requesting a piece
 		"piece":    piece,
 	}
-	
+
 	// Marshal the request into a buffer
 	err := bencode.Marshal(&buf, request)
 	if err != nil {
 		return err
 	}
 
-	// Calculate the message length
-	messageLength := uint32(2 + 1 + buf.Len()) // 2 for length prefix (msg_type + piece), 1 for ut_metadata ID
+	// Calculate the message length (including the prefix and ID)
+	messageLength := uint32(buf.Len() + 2) // +2 for the extension ID and message ID
 	var messageBuffer bytes.Buffer
-	
-	// Write the message length
-	binary.Write(&messageBuffer, binary.BigEndian, messageLength)
-	
-	// Write the message ID
-	messageBuffer.WriteByte(20) // 20 for ut_metadata
-	messageBuffer.WriteByte(byte(utMetadataID)) // Write the actual metadata message ID
 
-	// Append the marshaled request to the message buffer
+	// Write the message length to the buffer (BigEndian format)
+	binary.Write(&messageBuffer, binary.BigEndian, messageLength)
+
+	// Write the message ID (20 for 'ut_metadata')
+	messageBuffer.WriteByte(20) // Message ID for 'ut_metadata'
+
+	// Write the extension ID (this will depend on the peer's handshake)
+	messageBuffer.WriteByte(byte(utMetadataID)) // Peer-specific 'ut_metadata' extension ID
+
+	// Append the marshaled request (bencoded dictionary) to the message buffer
 	messageBuffer.Write(buf.Bytes())
 
 	// Send the complete message to the connection
@@ -210,30 +212,48 @@ func requestMetadataPiece(conn net.Conn, utMetadataID int, piece int) error {
 }
 
 
+type File struct {
+	Length	int	`bencode:"length"`
+	Path	[]string	`bencode:"path"`
+}
+
+type MetaData struct {
+	MsgType	int	`bencode:"msg_type"`
+	Piece	int	`bencode:"piece"`
+	TotalSize	int	`bencode:"total_size"`
+	Files	[]File	`bencode:"files"`
+	Name	string	`bencode:"name"`
+	PieceLength	int	`bencode:"piece length"`
+	Pieces	[]byte	`bencode:"pieces"`
+}
+
+
 func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	response := make([]byte, 655365)
-	n, err := conn.Read(response)
+	_, err := conn.Read(response)
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(response[:n])
 	response = response[3:]
 	if response[1] != 20 {
 		return nil, fmt.Errorf("unexpected message type")
 	}
-
-	var responseDict map[string]interface{}
-	err = bencode.Unmarshal(bytes.NewReader(response[3:]), &responseDict)
+	
+	response = response[3:]
+	
+	fmt.Println(string(response))
+	var responseDict MetaData
+	err = bencode.Unmarshal(bytes.NewReader(response), &responseDict)
 	if err != nil {
 		return nil, err
 	}
 
-	if responseDict["msg_type"].(int) != 1 {
+	if responseDict.MsgType != 1 {
 		return nil, fmt.Errorf("invalid msg_type in response")
 	}
-
-	if data, ok := responseDict["piece"].([]byte); ok {
-		return data, nil
+	fmt.Println(responseDict)
+	if responseDict.Piece>=0 {
+		return []byte(responseDict.Name), nil
 	}
 
 	return nil, fmt.Errorf("no piece data found in response")
