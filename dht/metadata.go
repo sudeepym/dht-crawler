@@ -224,9 +224,9 @@ type MetaData struct {
 	Files	[]File	`bencode:"files"`
 	Name	string	`bencode:"name"`
 	PieceLength	int	`bencode:"piece length"`
-	Pieces	[]byte	`bencode:"pieces"`
 }
 
+type Pieces []byte
 
 func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	response := make([]byte, 655365)
@@ -241,20 +241,49 @@ func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	
 	response = response[3:]
 	
-	fmt.Println(string(response))
-	var responseDict MetaData
-	err = bencode.Unmarshal(bytes.NewReader(response), &responseDict)
+	// fmt.Println(string(response))
+	metaRespIndex := bytes.Index([]byte(response), []byte("d5:files"))
+	metaResp := response[:metaRespIndex]
+	response = response[metaRespIndex:]
+	metaFilesIndex := bytes.Index([]byte(response), []byte("4:name"))
+	metaFiles := make([]byte, metaFilesIndex)
+	copy(metaFiles, response[:metaFilesIndex])
+	metaFiles = append(metaFiles, byte('e'))
+	response = response[metaFilesIndex:]
+	metaNameIndex := bytes.Index([]byte(response), []byte("6:pieces"))
+	metaName := make([]byte, metaNameIndex)
+	copy(metaName, response[:metaNameIndex])
+	metaName = append([]byte("d"),metaName...)
+	metaName = append(metaName, byte('e'))
+	response = response[metaNameIndex:]
+	
+	
+	metaPieces := Pieces(response)
+	_=metaPieces
+
+	var metaRespDict MetaData
+	err = bencode.Unmarshal(bytes.NewReader(metaResp), &metaRespDict)
 	if err != nil {
 		return nil, err
 	}
-
-	if responseDict.MsgType != 1 {
+	if metaRespDict.MsgType != 1 {
 		return nil, fmt.Errorf("invalid msg_type in response")
 	}
-	fmt.Println(responseDict)
-	if responseDict.Piece>=0 {
-		return []byte(responseDict.Name), nil
-	}
+	fmt.Println(metaRespDict)
 
-	return nil, fmt.Errorf("no piece data found in response")
+	var metaFilesDict MetaData
+	err = bencode.Unmarshal(bytes.NewReader(metaFiles), &metaFilesDict)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(metaFilesDict)
+	var metaNameDict MetaData
+	err = bencode.Unmarshal(bytes.NewReader(metaName), &metaNameDict)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(metaNameDict)
+	
+
+	return []byte(metaNameDict.Name),nil
 }
