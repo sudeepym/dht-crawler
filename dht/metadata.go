@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/jackpal/bencode-go"
@@ -52,8 +53,32 @@ func Metadata(peerIP, infohash string) {
 		log.Printf("Failed to retrieve metadata: %v", err)
 		return
 	}
+	metaNameIndex := bytes.Index(metadata, []byte("4:name"))
 
-	fmt.Println("Metadata retrieved:", string(metadata))
+	// Check if "4:name" exists in the metadata
+	if metaNameIndex != -1 {
+		// Find the colon after "4:name" to get the length of the name
+		colonIndex := metaNameIndex + len("4:name")
+		nameLengthStart := colonIndex
+		nameLengthEnd := bytes.IndexByte(metadata[nameLengthStart:], ':') + nameLengthStart
+		nameLengthStr := string(metadata[nameLengthStart:nameLengthEnd])
+
+		// Convert the length to an integer
+		nameLength, err := strconv.Atoi(nameLengthStr)
+		if err != nil {
+			fmt.Println("Error parsing name length:", err)
+			return
+		}
+
+		// Extract the name based on the length
+		nameStart := nameLengthEnd + 1
+		name := string(metadata[nameStart : nameStart+nameLength])
+
+		fmt.Println("Name extracted:", name)
+	} else {
+		fmt.Println("Name field not found in metadata.")
+	}
+	// fmt.Println("Metadata retrieved:", string(metadata))
 }
 
 func sendStandardHandshake(conn net.Conn, infohash string) error {
@@ -242,48 +267,48 @@ func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	response = response[3:]
 	
 	// fmt.Println(string(response))
-	metaRespIndex := bytes.Index([]byte(response), []byte("d5:files"))
-	metaResp := response[:metaRespIndex]
-	response = response[metaRespIndex:]
-	metaFilesIndex := bytes.Index([]byte(response), []byte("4:name"))
-	metaFiles := make([]byte, metaFilesIndex)
-	copy(metaFiles, response[:metaFilesIndex])
-	metaFiles = append(metaFiles, byte('e'))
-	response = response[metaFilesIndex:]
-	metaNameIndex := bytes.Index([]byte(response), []byte("6:pieces"))
-	metaName := make([]byte, metaNameIndex)
-	copy(metaName, response[:metaNameIndex])
-	metaName = append([]byte("d"),metaName...)
-	metaName = append(metaName, byte('e'))
-	response = response[metaNameIndex:]
+	// metaRespIndex := bytes.Index([]byte(response), []byte("d5:files"))
+	// metaResp := response[:metaRespIndex]
+	// response = response[metaRespIndex:]
+	// metaFilesIndex := bytes.Index([]byte(response), []byte("4:name"))
+	// metaFiles := make([]byte, metaFilesIndex)
+	// copy(metaFiles, response[:metaFilesIndex])
+	// metaFiles = append(metaFiles, byte('e'))
+	// response = response[metaFilesIndex:]
+	// metaNameIndex := bytes.Index([]byte(response), []byte("6:pieces"))
+	// metaName := make([]byte, metaNameIndex)
+	// copy(metaName, response[:metaNameIndex])
+	// metaName = append([]byte("d"),metaName...)
+	// metaName = append(metaName, byte('e'))
+	// response = response[metaNameIndex:]
 	
 	
-	metaPieces := Pieces(response)
-	_=metaPieces
+	// metaPieces := Pieces(response)
+	// _=metaPieces
 
-	var metaRespDict MetaData
-	err = bencode.Unmarshal(bytes.NewReader(metaResp), &metaRespDict)
-	if err != nil {
-		return nil, err
-	}
-	if metaRespDict.MsgType != 1 {
-		return nil, fmt.Errorf("invalid msg_type in response")
-	}
-	fmt.Println(metaRespDict)
+	// var metaRespDict MetaData
+	// err = bencode.Unmarshal(bytes.NewReader(metaResp), &metaRespDict)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// if metaRespDict.MsgType != 1 {
+	// 	return nil, fmt.Errorf("invalid msg_type in response")
+	// }
+	// fmt.Println(metaRespDict)
 
-	var metaFilesDict MetaData
-	err = bencode.Unmarshal(bytes.NewReader(metaFiles), &metaFilesDict)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(metaFilesDict)
-	var metaNameDict MetaData
-	err = bencode.Unmarshal(bytes.NewReader(metaName), &metaNameDict)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println(metaNameDict)
+	// var metaFilesDict MetaData
+	// err = bencode.Unmarshal(bytes.NewReader(metaFiles), &metaFilesDict)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println(metaFilesDict)
+	// var metaNameDict MetaData
+	// err = bencode.Unmarshal(bytes.NewReader(metaName), &metaNameDict)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println(metaNameDict)
 	
 
-	return []byte(metaNameDict.Name),nil
+	return response,nil
 }
