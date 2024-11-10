@@ -10,8 +10,35 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/boltdb/bolt"
 	"github.com/jackpal/bencode-go"
 )
+
+const (
+	dbPath = "./torrent.db"
+)
+
+// Function to open BoltDB
+func openBoltDB(dbPath string) (*bolt.DB, error) {
+	db, err := bolt.Open(dbPath, 0666, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open BoltDB: %v", err)
+	}
+	return db, nil
+}
+
+// Save infohash and metadata to BoltDB
+func saveMetadataToBoltDB(db *bolt.DB, infohash string, metadata []byte) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		// Create or get the "Metadata" bucket
+		bucket, err := tx.CreateBucketIfNotExists([]byte("Metadata"))
+		if err != nil {
+			return fmt.Errorf("failed to create bucket: %v", err)
+		}
+		// Store the metadata with the infohash as the key
+		return bucket.Put([]byte(infohash), metadata)
+	})
+}
 
 func Metadata(peerIP, infohash string) {
 	conn, err := net.DialTimeout("tcp", peerIP, 10*time.Second)
@@ -79,6 +106,19 @@ func Metadata(peerIP, infohash string) {
 		name := string(metadata[nameStart : nameStart+nameLength])
 
 		fmt.Println("Name extracted:", name)
+		// Open BoltDB
+		db, err := openBoltDB(dbPath)
+		if err != nil {
+			log.Printf("Failed to open BoltDB: %v", err)
+			return
+		}
+		defer db.Close()
+		err = saveMetadataToBoltDB(db, infohash, metadata)
+		if err != nil {
+			log.Printf("Failed to save metadata to BoltDB: %v", err)
+		} else {
+			fmt.Println("Metadata saved to BoltDB successfully")
+		}
 	} else {
 		fmt.Println("Name field not found in metadata.")
 	}
