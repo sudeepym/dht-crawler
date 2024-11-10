@@ -47,6 +47,10 @@ func Metadata(peerIP, infohash string) {
 	fmt.Printf("Peer supports ut_metadata with message ID: %d\n", utMetadataID)
 	fmt.Printf("Metadata size: %d bytes\n", metadataSize)
 
+	if metadataSize==0 {
+		return
+	}
+
 	// Retrieve all metadata pieces
 	metadata, err := retrieveMetadata(conn, utMetadataID, metadataSize)
 	if err != nil {
