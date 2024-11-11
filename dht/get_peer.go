@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jackpal/bencode-go"
 )
 
-var unique = make(map[string]struct{})
+var unique sync.Map
 
 // Request structure for get_peers
 type GetPeersReq struct {
@@ -41,6 +42,7 @@ type GetPeersResp struct {
 // Decode compact peer info (IP:Port)
 func decodeCompactPeers(peers []string, infohash string){
 	// fmt.Println("Got peers")
+	var wg sync.WaitGroup
 	for _, peer := range peers {
 		if len(peer) != 6 {
 			// fmt.Println("Invalid peer length:", len(peer))
@@ -49,17 +51,22 @@ func decodeCompactPeers(peers []string, infohash string){
 		ip := net.IP(peer[:4])                            // First 4 bytes are the IP address
 		port := binary.BigEndian.Uint16([]byte(peer[4:6])) // Last 2 bytes are the port
 		address := fmt.Sprintf("%s:%d", ip, port)
-		if _, exists := unique[address]; exists {
+		if _, loaded := unique.LoadOrStore(address, struct{}{}); loaded {
 			continue
 		}
-		unique[address] = struct{}{} // Mark as seen
+		unique.Store(address, struct{}{})
 		// fmt.Println(infohash)
 		// fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
 		if !CheckInfohashExists(infohash){
 			log.Printf("Infohash: %s, Peer IP: %s, Port: %d\n",infohash, ip, port)
-			Metadata(address,infohash)
+			wg.Add(1)
+			go func(addr, ih string) {
+				defer wg.Done()
+				Metadata(addr,ih)
+			}(address,infohash)
 		}
 	}
+	wg.Wait()
 }
 
 // Decode compact node info (NodeID, IP:Port)
@@ -71,10 +78,10 @@ func decodeCompactNodes(nodes string,infohash string) {
 		port := binary.BigEndian.Uint16([]byte(nodes[i+24 : i+26])) // 2 bytes for the port
 		// fmt.Printf("NodeID: %x, IP: %s, Port: %d\n", nodeID, ip, port)
 		address := fmt.Sprintf("%s:%d", ip, port)
-		if _, exists := unique[address]; exists {
+		if _, loaded := unique.LoadOrStore(address, struct{}{}); loaded {
 			continue
 		}
-		unique[address] = struct{}{}
+		unique.Store(address, struct{}{})
 		getPeer(address, infohash) // Recursively query the node
 	}
 }

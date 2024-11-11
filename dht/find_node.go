@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 
 	// "log"
 	"net"
@@ -126,25 +127,31 @@ func CrawlDHT() {
 			continue
 		}
 
-		infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
-		if err != nil {
-			// log.Printf("Error requesting infohashes from %s: %v\n", address, err)
-		} else {
-			// Print or store the discovered infohashes
-			for _, hash := range infohashes {
-				// fmt.Printf("Discovered infohash: %s\n", hash)
-				if !CheckInfohashExists(hash) {
-					Peers(hash)
-				}
-			}
-		}
-
 		// Print and queue new nodes
 		for _, node := range nodes {
 			if !visited[node] {
 				// fmt.Printf("Discovered node: %s\n", node)
 				queue = append(queue, node)
 			}
+		}
+
+		infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
+		if err != nil {
+			// log.Printf("Error requesting infohashes from %s: %v\n", address, err)
+		} else {
+			// Print or store the discovered infohashes
+			var wg sync.WaitGroup
+			for _, hash := range infohashes {
+				// fmt.Printf("Discovered infohash: %s\n", hash)
+				if !CheckInfohashExists(hash) {
+					wg.Add(1)
+					go func(ih string) {
+						defer wg.Done()
+						Peers(ih)
+					}(hash)
+				}
+			}
+			wg.Wait()
 		}
 	}
 }

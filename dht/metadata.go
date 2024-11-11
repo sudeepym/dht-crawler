@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/boltdb/bolt"
@@ -18,14 +19,40 @@ const (
 	dbPath = "./torrent.db"
 )
 
-// Function to open BoltDB
-func openBoltDB(dbPath string) (*bolt.DB, error) {
-	db, err := bolt.Open(dbPath, 0666, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open BoltDB: %v", err)
-	}
-	return db, nil
+var (
+    db     *bolt.DB
+    dbLock sync.Mutex // Mutex to handle concurrent access to the database
+)
+
+// Open BoltDB once and assign it to the global db variable
+func InitDB() error {
+    var err error
+    db, err = bolt.Open(dbPath, 0666, nil)
+    if err != nil {
+        return fmt.Errorf("failed to open BoltDB: %v", err)
+    }
+    return nil
 }
+
+// Close the database connection
+func CloseDB() {
+    if db != nil {
+        dbLock.Lock()
+        defer dbLock.Unlock()
+        if err := db.Close(); err != nil {
+            log.Printf("Error closing database: %v\n", err)
+        }
+    }
+}
+
+// Function to open BoltDB
+// func openBoltDB(dbPath string) (*bolt.DB, error) {
+// 	db, err := bolt.Open(dbPath, 0666, nil)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("failed to open BoltDB: %v", err)
+// 	}
+// 	return db, nil
+// }
 
 // Save infohash and metadata to BoltDB
 func saveMetadataToBoltDB(db *bolt.DB, infohash string, metadata []byte) error {
@@ -107,12 +134,12 @@ func Metadata(peerIP, infohash string) {
 
 		fmt.Println("Name extracted:", name)
 		// Open BoltDB
-		db, err := openBoltDB(dbPath)
-		if err != nil {
-			log.Printf("Failed to open BoltDB: %v", err)
-			return
-		}
-		defer db.Close()
+		// db, err := openBoltDB(dbPath)
+		// if err != nil {
+		// 	log.Printf("Failed to open BoltDB: %v", err)
+		// 	return
+		// }
+		// defer db.Close()
 		err = saveMetadataToBoltDB(db, infohash, metadata)
 		if err != nil {
 			log.Printf("Failed to save metadata to BoltDB: %v", err)
@@ -306,9 +333,9 @@ func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	}
 	response = response[3:]
 	
-	if response[1] != 20 {
-		return nil, fmt.Errorf("unexpected message type")
-	}
+	// if response[1] != 20 {
+	// 	return nil, fmt.Errorf("unexpected message type")
+	// }
 	
 	response = response[3:]
 

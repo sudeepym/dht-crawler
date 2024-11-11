@@ -11,16 +11,16 @@ import (
 
 func CheckInfohashExists(infohash string) bool {
 	// Open the BoltDB database file
-	db, err := bolt.Open("torrent.db", 0600, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+	// db, err := bolt.Open("torrent.db", 0600, nil)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer db.Close()
 
 	var exists bool
 
 	// Check if the infohash key exists in the "Metadata" bucket
-	err = db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		// Open the bucket
 		bucket := tx.Bucket([]byte("Metadata"))
 		if bucket == nil {

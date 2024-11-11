@@ -5,5 +5,7 @@ import (
 )
 
 func main() {
+	dht.InitDB()
+	defer dht.CloseDB()
 	dht.CrawlDHT()
 }
