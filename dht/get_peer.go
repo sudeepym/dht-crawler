@@ -56,7 +56,7 @@ func decodeCompactPeers(peers []string, infohash string){
 		// fmt.Println(infohash)
 		// fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
 		if !CheckInfohashExists(infohash){
-			log.Printf("Peer IP: %s, Port: %d\n", ip, port)
+			log.Printf("Infohash: %s, Peer IP: %s, Port: %d\n",infohash, ip, port)
 			Metadata(address,infohash)
 		}
 	}
