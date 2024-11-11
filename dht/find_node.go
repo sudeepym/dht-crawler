@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+
+	// "log"
 	"net"
 	"time"
 
@@ -127,12 +128,14 @@ func CrawlDHT() {
 
 		infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
 		if err != nil {
-			log.Printf("Error requesting infohashes from %s: %v\n", address, err)
+			// log.Printf("Error requesting infohashes from %s: %v\n", address, err)
 		} else {
 			// Print or store the discovered infohashes
 			for _, hash := range infohashes {
 				// fmt.Printf("Discovered infohash: %s\n", hash)
-				Peers(hash)
+				if !CheckInfohashExists(hash) {
+					Peers(hash)
+				}
 			}
 		}
 

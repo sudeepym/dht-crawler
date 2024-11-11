@@ -86,7 +86,7 @@ func sendSampleInfohashRequest(nodeID, address, target string) ([]string, error)
 func parseInfohashes(samples []byte) []string {
 	var infohashes []string
 	if len(samples)%20 != 0 {
-		fmt.Println("Warning: samples length is not a multiple of 20 bytes")
+		// fmt.Println("Warning: samples length is not a multiple of 20 bytes")
 	}
 	for i := 0; i+20 <= len(samples); i += 20 {
 		infohash := fmt.Sprintf("%x", samples[i:i+20]) // Convert each 20-byte hash to a hex string

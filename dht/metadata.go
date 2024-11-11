@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
+	// "log"
 	"net"
 	"strconv"
 	"time"
@@ -43,36 +43,36 @@ func saveMetadataToBoltDB(db *bolt.DB, infohash string, metadata []byte) error {
 func Metadata(peerIP, infohash string) {
 	conn, err := net.DialTimeout("tcp", peerIP, 10*time.Second)
 	if err != nil {
-		log.Printf("Failed to connect to peer: %v", err)
+		// log.Printf("Failed to connect to peer: %v", err)
 		return
 	}
 	defer conn.Close()
 
 	err = sendStandardHandshake(conn, infohash)
 	if err != nil {
-		log.Printf("Failed to send handshake: %v", err)
+		// log.Printf("Failed to send handshake: %v", err)
 		return
 	}
 
 	if err = receivePeerHandshake(conn); err != nil {
-		log.Printf("Failed to receive peer handshake: %v", err)
+		// log.Printf("Failed to receive peer handshake: %v", err)
 		return
 	}
 
 	err = sendExtensionHandshake(conn)
 	if err != nil {
-		log.Printf("Failed to send extension handshake: %v", err)
+		// log.Printf("Failed to send extension handshake: %v", err)
 		return
 	}
 
 	utMetadataID, metadataSize, err := receiveExtensionHandshakeResponse(conn)
 	if err != nil {
-		log.Printf("Failed to receive extension handshake response: %v", err)
+		// log.Printf("Failed to receive extension handshake response: %v", err)
 		return
 	}
 
-	fmt.Printf("Peer supports ut_metadata with message ID: %d\n", utMetadataID)
-	fmt.Printf("Metadata size: %d bytes\n", metadataSize)
+	// fmt.Printf("Peer supports ut_metadata with message ID: %d\n", utMetadataID)
+	// fmt.Printf("Metadata size: %d bytes\n", metadataSize)
 
 	if metadataSize==0 {
 		return
@@ -81,7 +81,7 @@ func Metadata(peerIP, infohash string) {
 	// Retrieve all metadata pieces
 	metadata, err := retrieveMetadata(conn, utMetadataID, metadataSize)
 	if err != nil {
-		log.Printf("Failed to retrieve metadata: %v", err)
+		// log.Printf("Failed to retrieve metadata: %v", err)
 		return
 	}
 	metaNameIndex := bytes.Index(metadata, []byte("4:name"))
@@ -97,7 +97,7 @@ func Metadata(peerIP, infohash string) {
 		// Convert the length to an integer
 		nameLength, err := strconv.Atoi(nameLengthStr)
 		if err != nil {
-			fmt.Println("Error parsing name length:", err)
+			// fmt.Println("Error parsing name length:", err)
 			return
 		}
 
@@ -105,22 +105,23 @@ func Metadata(peerIP, infohash string) {
 		nameStart := nameLengthEnd + 1
 		name := string(metadata[nameStart : nameStart+nameLength])
 
-		fmt.Println("Name extracted:", name)
+		// fmt.Println("Name extracted:", name)
 		// Open BoltDB
 		db, err := openBoltDB(dbPath)
 		if err != nil {
-			log.Printf("Failed to open BoltDB: %v", err)
+			// log.Printf("Failed to open BoltDB: %v", err)
 			return
 		}
 		defer db.Close()
 		err = saveMetadataToBoltDB(db, infohash, metadata)
 		if err != nil {
-			log.Printf("Failed to save metadata to BoltDB: %v", err)
+			// log.Printf("Failed to save metadata to BoltDB: %v", err)
 		} else {
-			fmt.Println("Metadata saved to BoltDB successfully")
+			fmt.Printf("Infohash : %s, Name : %s\n",infohash,name)
+			// fmt.Println("Metadata saved to BoltDB successfully")
 		}
 	} else {
-		fmt.Println("Name field not found in metadata.")
+		// fmt.Println("Name field not found in metadata.")
 	}
 	// fmt.Println("Metadata retrieved:", string(metadata))
 }
@@ -208,7 +209,7 @@ func receiveExtensionHandshakeResponse(conn net.Conn) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	fmt.Println(response)
+	// fmt.Println(response)
 	utMetadataID := 0
 	if _, ok := response.Extensions["ut_metadata"]; ok {
 		utMetadataID = response.Extensions["ut_metadata"]
@@ -309,50 +310,6 @@ func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	}
 	
 	response = response[3:]
-	
-	// fmt.Println(string(response))
-	// metaRespIndex := bytes.Index([]byte(response), []byte("d5:files"))
-	// metaResp := response[:metaRespIndex]
-	// response = response[metaRespIndex:]
-	// metaFilesIndex := bytes.Index([]byte(response), []byte("4:name"))
-	// metaFiles := make([]byte, metaFilesIndex)
-	// copy(metaFiles, response[:metaFilesIndex])
-	// metaFiles = append(metaFiles, byte('e'))
-	// response = response[metaFilesIndex:]
-	// metaNameIndex := bytes.Index([]byte(response), []byte("6:pieces"))
-	// metaName := make([]byte, metaNameIndex)
-	// copy(metaName, response[:metaNameIndex])
-	// metaName = append([]byte("d"),metaName...)
-	// metaName = append(metaName, byte('e'))
-	// response = response[metaNameIndex:]
-	
-	
-	// metaPieces := Pieces(response)
-	// _=metaPieces
-
-	// var metaRespDict MetaData
-	// err = bencode.Unmarshal(bytes.NewReader(metaResp), &metaRespDict)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// if metaRespDict.MsgType != 1 {
-	// 	return nil, fmt.Errorf("invalid msg_type in response")
-	// }
-	// fmt.Println(metaRespDict)
-
-	// var metaFilesDict MetaData
-	// err = bencode.Unmarshal(bytes.NewReader(metaFiles), &metaFilesDict)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(metaFilesDict)
-	// var metaNameDict MetaData
-	// err = bencode.Unmarshal(bytes.NewReader(metaName), &metaNameDict)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(metaNameDict)
-	
 
 	return response,nil
 }

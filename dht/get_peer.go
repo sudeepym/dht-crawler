@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -42,7 +43,7 @@ func decodeCompactPeers(peers []string, infohash string){
 	// fmt.Println("Got peers")
 	for _, peer := range peers {
 		if len(peer) != 6 {
-			fmt.Println("Invalid peer length:", len(peer))
+			// fmt.Println("Invalid peer length:", len(peer))
 			continue
 		}
 		ip := net.IP(peer[:4])                            // First 4 bytes are the IP address
@@ -52,9 +53,12 @@ func decodeCompactPeers(peers []string, infohash string){
 			continue
 		}
 		unique[address] = struct{}{} // Mark as seen
-		fmt.Println(infohash)
-		fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
-		Metadata(address,infohash)
+		// fmt.Println(infohash)
+		// fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
+		if !CheckInfohashExists(infohash){
+			log.Printf("Peer IP: %s, Port: %d\n", ip, port)
+			Metadata(address,infohash)
+		}
 	}
 }
 
