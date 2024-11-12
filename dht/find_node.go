@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"log"
+	// "log"
 	"net"
 	"time"
 
@@ -113,7 +113,7 @@ const (
 var (
 	semaphore    = make(chan struct{}, maxConcurrentConnections)
 	activeNodes  = sync.Map{}
-	lastCleanup  = time.Now()
+	// lastCleanup  = time.Now()
 )
 
 // NodeInfo stores information about each DHT node
@@ -187,7 +187,7 @@ func processNode(address, nodeID, target string, queue chan string) {
 			// Node added to queue
 		default:
 			// Queue is full, skip this node
-			log.Printf("Queue is full, skipping node: %s", node)
+			// log.Printf("Queue is full, skipping node: %s", node)
 		}
 	}
 
@@ -264,7 +264,7 @@ func processInfohashes(address, nodeID, target string) {
 
 				select {
 				case <-ctx.Done():
-					log.Printf("Timeout processing infohash: %s", ih)
+					// log.Printf("Timeout processing infohash: %s", ih)
 				case <-done:
 					// Successfully processed
 				}
@@ -288,7 +288,6 @@ func periodicCleanup() {
 			return true
 		})
 	}
-	lastCleanup = time.Now()
 }
 
 // Additional helper function to enforce timeouts on find_node requests

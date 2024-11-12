@@ -1,0 +1,3 @@
+# Ignore the torrent database file
+torrent.db
+torrent.db.lock

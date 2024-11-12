@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
+	// "log"
 	"net"
 	"sync"
 	"time"
@@ -58,7 +58,7 @@ func decodeCompactPeers(peers []string, infohash string){
 		// fmt.Println(infohash)
 		// fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
 		if !CheckInfohashExists(infohash){
-			log.Printf("Infohash: %s, Peer IP: %s, Port: %d\n",infohash, ip, port)
+			// log.Printf("Infohash: %s, Peer IP: %s, Port: %d\n",infohash, ip, port)
 			wg.Add(1)
 			go func(addr, ih string) {
 				defer wg.Done()
