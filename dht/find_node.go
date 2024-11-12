@@ -5,8 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	// "log"
+	"log"
 	"net"
 	"time"
 
@@ -101,57 +100,217 @@ func sendFindNodeRequest(target, nodeID, address string) ([]string, error) {
 	return nodes, nil
 }
 
-// Recursive function to query DHT nodes and expand the search
+// Configuration constants
+const (
+	maxConcurrentConnections = 100
+	connectionTimeout       = 5 * time.Second
+	requestTimeout         = 10 * time.Second
+	maxQueueSize          = 10000
+	cleanupInterval       = 5 * time.Minute
+)
+
+// Global connection limiter
+var (
+	semaphore    = make(chan struct{}, maxConcurrentConnections)
+	activeNodes  = sync.Map{}
+	lastCleanup  = time.Now()
+)
+
+// NodeInfo stores information about each DHT node
+type NodeInfo struct {
+	lastAccessed time.Time
+	failures     int
+}
+
+// Improved CrawlDHT with connection pooling and rate limiting
 func CrawlDHT() {
 	nodeID := "abcdefghij0123456789"
 	target := "mnopqrstuvwxyz123456"
-	// Start with bootstrap nodes
-	queue := bootstrapNodes
+	
+	// Use bounded queue for nodes
+	queue := make(chan string, maxQueueSize)
+	for _, node := range bootstrapNodes {
+		queue <- node
+	}
 
-	// Set to track visited nodes
-	visited := make(map[string]bool)
+	// Start cleanup goroutine
+	go periodicCleanup()
 
-	for len(queue) > 0 {
-		address := queue[0]
-		queue = queue[1:]
-
-		if visited[address] {
-			continue
-		}
-		visited[address] = true
-
-		// fmt.Printf("Querying node: %s\n", address)
-		nodes, err := sendFindNodeRequest(target, nodeID, address)
-		if err != nil {
-			// log.Printf("Error querying %s: %v\n", address, err)
-			continue
-		}
-
-		// Print and queue new nodes
-		for _, node := range nodes {
-			if !visited[node] {
-				// fmt.Printf("Discovered node: %s\n", node)
-				queue = append(queue, node)
+	var wg sync.WaitGroup
+	for i := 0; i < maxConcurrentConnections; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for address := range queue {
+				processNode(address, nodeID, target, queue)
 			}
-		}
+		}()
+	}
 
-		infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
-		if err != nil {
-			// log.Printf("Error requesting infohashes from %s: %v\n", address, err)
-		} else {
-			// Print or store the discovered infohashes
-			var wg sync.WaitGroup
-			for _, hash := range infohashes {
-				// fmt.Printf("Discovered infohash: %s\n", hash)
-				if !CheckInfohashExists(hash) {
-					wg.Add(1)
-					go func(ih string) {
-						defer wg.Done()
-						Peers(ih)
-					}(hash)
+	wg.Wait()
+}
+
+// Process a single node with proper error handling and backoff
+func processNode(address, nodeID, target string, queue chan string) {
+	// Acquire semaphore
+	semaphore <- struct{}{}
+	defer func() { <-semaphore }()
+
+	// Check node health
+	if !isNodeHealthy(address) {
+		return
+	}
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
+
+	// Try to establish connection
+	conn, err := createConnection(ctx, address)
+	if err != nil {
+		markNodeFailure(address)
+		return
+	}
+	defer conn.Close()
+
+	// Process find_node request
+	nodes, err := sendFindNodeRequestWithTimeout(conn, target, nodeID)
+	if err != nil {
+		markNodeFailure(address)
+		return
+	}
+
+	// Queue new nodes with bounds checking
+	for _, node := range nodes {
+		select {
+		case queue <- node:
+			// Node added to queue
+		default:
+			// Queue is full, skip this node
+			log.Printf("Queue is full, skipping node: %s", node)
+		}
+	}
+
+	// Process infohashes with bounded concurrency
+	processInfohashes(address, nodeID, target)
+}
+
+// Check if a node is healthy enough to process
+func isNodeHealthy(address string) bool {
+	if value, ok := activeNodes.Load(address); ok {
+		nodeInfo := value.(NodeInfo)
+		if nodeInfo.failures > 3 {
+			return false
+		}
+		if time.Since(nodeInfo.lastAccessed) < time.Minute {
+			return false
+		}
+	}
+	return true
+}
+
+// Mark node failure and update its status
+func markNodeFailure(address string) {
+	if value, ok := activeNodes.Load(address); ok {
+		nodeInfo := value.(NodeInfo)
+		nodeInfo.failures++
+		activeNodes.Store(address, nodeInfo)
+	} else {
+		activeNodes.Store(address, NodeInfo{
+			lastAccessed: time.Now(),
+			failures:     1,
+		})
+	}
+}
+
+// Create connection with timeout
+func createConnection(ctx context.Context, address string) (net.Conn, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "udp4", address)
+	if err != nil {
+		return nil, fmt.Errorf("connection failed: %v", err)
+	}
+	return conn, nil
+}
+
+// Process infohashes with proper concurrency control
+func processInfohashes(address, nodeID, target string) {
+	infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
+	if err != nil {
+		return
+	}
+
+	// Use bounded worker pool for processing infohashes
+	workerPool := make(chan struct{}, 20)
+	var wg sync.WaitGroup
+
+	for _, hash := range infohashes {
+		if !CheckInfohashExists(hash) {
+			wg.Add(1)
+			workerPool <- struct{}{} // Acquire worker
+			
+			go func(ih string) {
+				defer wg.Done()
+				defer func() { <-workerPool }() // Release worker
+				
+				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+				defer cancel()
+				
+				done := make(chan struct{})
+				go func() {
+					Peers(ih)
+					close(done)
+				}()
+
+				select {
+				case <-ctx.Done():
+					log.Printf("Timeout processing infohash: %s", ih)
+				case <-done:
+					// Successfully processed
 				}
-			}
-			wg.Wait()
+			}(hash)
 		}
+	}
+
+	wg.Wait()
+}
+
+// Periodic cleanup of inactive nodes
+func periodicCleanup() {
+	ticker := time.NewTicker(cleanupInterval)
+	for range ticker.C {
+		now := time.Now()
+		activeNodes.Range(func(key, value interface{}) bool {
+			nodeInfo := value.(NodeInfo)
+			if now.Sub(nodeInfo.lastAccessed) > cleanupInterval {
+				activeNodes.Delete(key)
+			}
+			return true
+		})
+	}
+	lastCleanup = time.Now()
+}
+
+// Additional helper function to enforce timeouts on find_node requests
+func sendFindNodeRequestWithTimeout(conn net.Conn, target, nodeID string) ([]string, error) {
+	done := make(chan []string, 1)
+	errChan := make(chan error, 1)
+
+	go func() {
+		nodes, err := sendFindNodeRequest(target, nodeID, conn.RemoteAddr().String())
+		if err != nil {
+			errChan <- err
+			return
+		}
+		done <- nodes
+	}()
+
+	select {
+	case nodes := <-done:
+		return nodes, nil
+	case err := <-errChan:
+		return nil, err
+	case <-time.After(requestTimeout):
+		return nil, fmt.Errorf("request timed out")
 	}
 }
