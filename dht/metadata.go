@@ -9,8 +9,6 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"time"
-
 	"github.com/boltdb/bolt"
 	"github.com/jackpal/bencode-go"
 )
@@ -68,7 +66,7 @@ func saveMetadataToBoltDB(db *bolt.DB, infohash string, metadata []byte) error {
 }
 
 func Metadata(peerIP, infohash string) {
-	conn, err := net.DialTimeout("tcp", peerIP, 10*time.Second)
+	conn, err := net.DialTimeout("tcp", peerIP, connectionTimeout)
 	if err != nil {
 		// log.Printf("Failed to connect to peer: %v", err)
 		return
@@ -307,23 +305,6 @@ func requestMetadataPiece(conn net.Conn, utMetadataID int, piece int) error {
 	_, err = conn.Write(messageBuffer.Bytes())
 	return err
 }
-
-
-type File struct {
-	Length	int	`bencode:"length"`
-	Path	[]string	`bencode:"path"`
-}
-
-type MetaData struct {
-	MsgType	int	`bencode:"msg_type"`
-	Piece	int	`bencode:"piece"`
-	TotalSize	int	`bencode:"total_size"`
-	Files	[]File	`bencode:"files"`
-	Name	string	`bencode:"name"`
-	PieceLength	int	`bencode:"piece length"`
-}
-
-type Pieces []byte
 
 func receiveMetadataPiece(conn net.Conn) ([]byte, error) {
 	response := make([]byte, 655365)

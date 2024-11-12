@@ -66,7 +66,7 @@ func sendFindNodeRequest(target, nodeID, address string) ([]string, error) {
 
 	// Create UDP connection
 	var d net.Dialer
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 	conn, err := d.DialContext(ctx, "udp4", address)
 	if err != nil {
@@ -81,7 +81,7 @@ func sendFindNodeRequest(target, nodeID, address string) ([]string, error) {
 
 	// Read response
 	resp := make([]byte, 65535)
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(requestTimeout))
 	_, err = conn.Read(resp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)

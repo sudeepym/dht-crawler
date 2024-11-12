@@ -63,8 +63,9 @@ func ShowMetadataForInfohash(infohash string){
 			return nil
 		}
 		// Convert metadata to string and display it (assuming metadata is stored as bytes)
-		fmt.Println("Metadata for infohash:", infohash)
-		fmt.Println(string(metadata)) // Or handle it as needed (e.g., unmarshal if JSON or bencode)
+		// fmt.Println("Metadata for infohash:", infohash)
+		// fmt.Println(string(metadata)) // Or handle it as needed (e.g., unmarshal if JSON or bencode)
+		ParseMetadata(metadata)
 
 		return nil
 	})
@@ -107,8 +108,24 @@ func ShowInfohashes(){
 	}
 }
 
+type File struct {
+	Length	int	`bencode:"length"`
+	Path	[]string	`bencode:"path"`
+}
+
+type MetaData struct {
+	MsgType	int	`bencode:"msg_type"`
+	Piece	int	`bencode:"piece"`
+	TotalSize	int	`bencode:"total_size"`
+	Files	[]File	`bencode:"files"`
+	Name	string	`bencode:"name"`
+	PieceLength	int	`bencode:"piece length"`
+}
+
+type Pieces string
+
 func ParseMetadata(metadata []byte){
-	fmt.Println(string(metadata))
+	// fmt.Println(string(metadata))
 	metaRespIndex := bytes.Index([]byte(metadata), []byte("d5:files"))
 	metaResp := metadata[:metaRespIndex]
 	metadata = metadata[metaRespIndex:]
@@ -122,11 +139,7 @@ func ParseMetadata(metadata []byte){
 	copy(metaName, metadata[:metaNameIndex])
 	metaName = append([]byte("d"),metaName...)
 	metaName = append(metaName, byte('e'))
-	metadata = metadata[metaNameIndex:]
-	
-	
-	metaPieces := Pieces(metadata)
-	_=metaPieces
+	// metadata = metadata[metaNameIndex:]
 
 	var metaRespDict MetaData
 	err := bencode.Unmarshal(bytes.NewReader(metaResp), &metaRespDict)
@@ -151,5 +164,7 @@ func ParseMetadata(metadata []byte){
 		log.Fatal(err)
 	}
 	fmt.Println(metaNameDict)
-	
+
+	// metaPieces := Pieces(metadata)
+	// fmt.Println(metaPieces)
 }

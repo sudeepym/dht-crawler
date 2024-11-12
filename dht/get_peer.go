@@ -106,7 +106,7 @@ func getPeer(address string, infohash string) {
 
 	// Create UDP connection to DHT node
 	var d net.Dialer
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
 	defer cancel()
 	conn, err := d.DialContext(ctx, "udp4", address)
 	if err != nil {
@@ -123,7 +123,7 @@ func getPeer(address string, infohash string) {
 
 	// Read response
 	resp := make([]byte, 65535) // Large buffer for response
-	conn.SetReadDeadline(time.Now().Add(10 * time.Second)) // 10-second timeout
+	conn.SetReadDeadline(time.Now().Add(requestTimeout)) // 10-second timeout
 	n, err := conn.Read(resp)
 	if err != nil {
 		// fmt.Printf("Failed to read response: %v\n", err)
