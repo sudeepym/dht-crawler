@@ -123,7 +123,7 @@ type NodeInfo struct {
 }
 
 // Improved CrawlDHT with connection pooling and rate limiting
-func CrawlDHT() {
+func CrawlDHT(ctx context.Context) {
 	nodeID := "abcdefghij0123456789"
 	target := "mnopqrstuvwxyz123456"
 	
@@ -141,8 +141,11 @@ func CrawlDHT() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for address := range queue {
-				processNode(address, nodeID, target, queue)
+			select {
+			case address := <-queue:
+				processNode(ctx, address, nodeID, target, queue)
+			case <-ctx.Done():
+				return
 			}
 		}()
 	}
@@ -151,9 +154,13 @@ func CrawlDHT() {
 }
 
 // Process a single node with proper error handling and backoff
-func processNode(address, nodeID, target string, queue chan string) {
+func processNode(ctx context.Context, address, nodeID, target string, queue chan string) {
 	// Acquire semaphore
-	semaphore <- struct{}{}
+	select {
+    case semaphore <- struct{}{}:
+    case <-ctx.Done():
+        return
+    }
 	defer func() { <-semaphore }()
 
 	// Check node health
@@ -162,8 +169,8 @@ func processNode(address, nodeID, target string, queue chan string) {
 	}
 
 	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	// defer cancel()
 
 	// Try to establish connection
 	conn, err := createConnection(ctx, address)
@@ -183,16 +190,14 @@ func processNode(address, nodeID, target string, queue chan string) {
 	// Queue new nodes with bounds checking
 	for _, node := range nodes {
 		select {
-		case queue <- node:
-			// Node added to queue
-		default:
-			// Queue is full, skip this node
-			// log.Printf("Queue is full, skipping node: %s", node)
-		}
+        case queue <- node:
+        case <-ctx.Done():
+            return
+        }
 	}
 
 	// Process infohashes with bounded concurrency
-	processInfohashes(address, nodeID, target)
+	processInfohashes(ctx,address, nodeID, target)
 }
 
 // Check if a node is healthy enough to process
@@ -234,7 +239,7 @@ func createConnection(ctx context.Context, address string) (net.Conn, error) {
 }
 
 // Process infohashes with proper concurrency control
-func processInfohashes(address, nodeID, target string) {
+func processInfohashes(ctx context.Context,address, nodeID, target string) {
 	infohashes, err := sendSampleInfohashRequest(nodeID, address, target)
 	if err != nil {
 		return
@@ -253,8 +258,8 @@ func processInfohashes(address, nodeID, target string) {
 				defer wg.Done()
 				defer func() { <-workerPool }() // Release worker
 				
-				ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
-				defer cancel()
+				// ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+				// defer cancel()
 				
 				done := make(chan struct{})
 				go func() {

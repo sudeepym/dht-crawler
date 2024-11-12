@@ -42,7 +42,7 @@ type GetPeersResp struct {
 // Decode compact peer info (IP:Port)
 func decodeCompactPeers(peers []string, infohash string){
 	// fmt.Println("Got peers")
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 	for _, peer := range peers {
 		if len(peer) != 6 {
 			// fmt.Println("Invalid peer length:", len(peer))
@@ -59,14 +59,14 @@ func decodeCompactPeers(peers []string, infohash string){
 		// fmt.Printf("Peer IP: %s, Port: %d\n", ip, port)
 		if !CheckInfohashExists(infohash){
 			// log.Printf("Infohash: %s, Peer IP: %s, Port: %d\n",infohash, ip, port)
-			wg.Add(1)
-			go func(addr, ih string) {
-				defer wg.Done()
-				Metadata(addr,ih)
-			}(address,infohash)
+			// wg.Add(1)
+			// go func(addr, ih string) {
+			// 	defer wg.Done()
+				Metadata(address,infohash)
+			// }(address,infohash)
 		}
 	}
-	wg.Wait()
+	// wg.Wait()
 }
 
 // Decode compact node info (NodeID, IP:Port)
