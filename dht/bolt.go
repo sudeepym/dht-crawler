@@ -90,12 +90,14 @@ func ShowInfohashes(){
 		}
 
 		// Iterate over each key-value pair in the bucket
+		i:=1
 		err = bucket.ForEach(func(k, v []byte) error {
 			infohash := string(k)
 			metadata := string(v) // Assuming metadata is stored as a string; adapt as needed
 			_ = metadata
 			// Print or process each infohash-metadata pair
-			fmt.Printf("Infohash: %s\n", infohash)
+			fmt.Printf("%d: %s\n",i, infohash)
+			i++
 			return nil
 		})
 		return nil
