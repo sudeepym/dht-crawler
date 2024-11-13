@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func main() {
+func Crawler(){
 	dht.InitDB()
 	defer dht.CloseDB()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -16,4 +16,10 @@ func main() {
         cancel()
     }()
     dht.CrawlDHT(ctx)
+}
+
+func main() {
+	dht.InitDB()
+	defer dht.CloseDB()
+	dht.Query("Sheldon")
 }
