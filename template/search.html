@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Search</title>
+</head>
+<body>
+    <h1>Search</h1>
+    <form action="/search" method="POST">
+        <div>
+            <input name="query" id="query" placeholder="Enter here" />
+        </div>
+        <div>
+            <ul>
+                {{range .SearchResult}}
+                <li>
+                    <ul>
+                        <li>Infohash: {{.Infohash}}</li>
+                        <li>Name: {{.Name}}</li>
+                        <!-- <li>Files:
+                            <ul>
+                                {{range .Files}}
+                                <li>{{.}}</li>
+                                {{end}}
+                            </ul>
+                        </li> -->
+                    </ul>
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </form>
+</body>
+</html>

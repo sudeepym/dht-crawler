@@ -144,6 +144,8 @@ func Metadata(peerIP, infohash string) {
 		} else {
 			fmt.Printf("Infohash : %s, Name : %s\n",infohash,name)
 			// fmt.Println("Metadata saved to BoltDB successfully")
+			name, files := ParseMetadata(metadata)
+			Index(infohash,name,files)
 		}
 	} else {
 		// fmt.Println("Name field not found in metadata.")
