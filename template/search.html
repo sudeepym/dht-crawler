@@ -2,33 +2,154 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #282c34;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2em;
+        }
+
+        .search-form {
+            width: 80%;
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            outline: none;
+        }
+
+        .search-form input:focus {
+            border-color: #4CAF50;
+        }
+
+        .search-results {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .search-results li {
+            background-color: #fff;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1);
+            text-wrap: wrap;
+        }
+
+        .search-results li ul {
+            list-style-type: none;
+            padding: 0;
+            text-wrap: wrap;
+        }
+
+        .search-results li ul li {
+            margin: 5px 0;
+            text-wrap: wrap;
+        }
+
+        .search-results li ul li span {
+            font-weight: bold;
+            text-wrap: wrap;
+        }
+
+        .file-list {
+            display: none;
+            padding-left: 20px;
+            margin-top: 10px;
+        }
+
+        .file-list.open {
+            display: block;
+            text-wrap: wrap;
+        }
+
+        .file-toggle {
+            cursor: pointer;
+            color: #4CAF50;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #282c34;
+            color: white;
+            margin-top: 20px;
+            bottom: 0;
+            position: fixed;
+            width: 100vw;
+        }
+    </style>
+    <script>
+        // Toggle file list visibility on click
+        function toggleFileList(event) {
+            const fileList = event.target.nextElementSibling;
+            fileList.classList.toggle('open');
+        }
+    </script>
 </head>
 <body>
-    <h1>Search</h1>
-    <form action="/search" method="POST">
-        <div>
-            <input name="query" id="query" placeholder="Enter here" />
-        </div>
-        <div>
-            <ul>
-                {{range .SearchResult}}
-                <li>
-                    <ul>
-                        <li>Infohash: {{.Infohash}}</li>
-                        <li>Name: {{.Name}}</li>
-                        <!-- <li>Files:
-                            <ul>
-                                {{range .Files}}
-                                <li>{{.}}</li>
-                                {{end}}
-                            </ul>
-                        </li> -->
-                    </ul>
-                </li>
-                {{end}}
-            </ul>
-        </div>
-    </form>
+    <header>
+        <h1>Search for Torrents</h1>
+    </header>
+
+    <div class="search-form">
+        <form action="/search" method="POST">
+            <div>
+                <input name="query" id="query" placeholder="Enter search term here..." />
+            </div>
+            <div>
+                <ul class="search-results">
+                    {{range .SearchResult}}
+                    <li>
+                        <ul>
+                            <li><span>Infohash:</span> {{.Infohash}}</li>
+                            <li><span>Name:</span> {{.Name}}</li>
+                            <li>
+                                <span class="file-toggle" onclick="toggleFileList(event)">Files (Click to view)</span>
+                                <ul class="file-list">
+                                    {{range .Files}}
+                                    <li>{{.}}</li>
+                                    {{end}}
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                    {{end}}
+                </ul>
+            </div>
+        </form>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Torrent Search Engine</p>
+    </footer>
 </body>
 </html>

@@ -1,11 +1,9 @@
 package dht
 
 import (
+	"encoding/binary"
 	"fmt"
-	"log"
 	"sort"
-	"strings"
-	"unicode"
 
 	"github.com/boltdb/bolt"
 )
@@ -16,53 +14,100 @@ type SearchResult struct {
 	Files    []string
 }
 
-func Query(query string) []SearchResult {
-	var ret []SearchResult
-	query = strings.ToLower(query)
-	scoreMap := make(map[string]int)
-	splitter := func(c rune) bool {
-		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
-	}
+// QueryResult represents a search result with its score
+type QueryResult struct {
+    SearchResult
+    Score int
+}
 
-	err := db.View(func(tx *bolt.Tx) error {
-		searchBucket := tx.Bucket([]byte("Search"))
-		if searchBucket == nil {
-			return fmt.Errorf("bucket 'Search' not found")
-		}
+// Query performs an optimized search query
+func Query(query string) ([]SearchResult, error) {
+    if query == "" {
+        return nil, fmt.Errorf("empty query provided")
+    }
 
-		for _, token := range strings.FieldsFunc(query, splitter) {
-			wordBucket := searchBucket.Bucket([]byte(token))
-			if wordBucket == nil {
-				log.Printf("Token '%s' not found, skipping.", token)
-				continue
-			}
+    scorer := NewTokenScorer()
+    tokens := scorer.tokenize(query)
+    if len(tokens) == 0 {
+        return nil, fmt.Errorf("no valid tokens in query")
+    }
 
-			wordBucket.ForEach(func(infohash, scoreData []byte) error {
-				score := bytesToInt(scoreData)
-				scoreMap[string(infohash)] += score
-				return nil
-			})
-		}
-		return nil
-	})
+    // Use channels for concurrent processing
+    scoresChan := make(chan map[string]int, 1)
+    errorsChan := make(chan error, 1)
 
-	if err != nil {
-		log.Fatal(err)
-	}
+    // Process scores concurrently
+    go func() {
+        scoreMap := make(map[string]int)
+        
+        err := db.View(func(tx *bolt.Tx) error {
+            searchBucket := tx.Bucket([]byte(searchBucketName))
+            if searchBucket == nil {
+                return fmt.Errorf("search bucket not found")
+            }
 
-	// Sort keys by score in descending order
-	keys := make([]string, 0, len(scoreMap))
-	for key := range scoreMap {
-		keys = append(keys, key)
-	}
-	sort.SliceStable(keys, func(i, j int) bool {
-		return scoreMap[keys[i]] > scoreMap[keys[j]]
-	})
+            for _, token := range tokens {
+                if len(token) <= 2 {
+                    continue
+                }
 
-	// Fetch metadata for each sorted infohash
-	for _, key := range keys {
-		name, files := ParseMetadata(ShowMetadataForInfohash(key))
-		ret = append(ret, SearchResult{Infohash: key, Name: name, Files: files})
-	}
-	return ret
+                wordBucket := searchBucket.Bucket([]byte(token))
+                if wordBucket == nil {
+                    continue
+                }
+
+                if err := wordBucket.ForEach(func(infohash, scoreData []byte) error {
+                    score := int(binary.BigEndian.Uint32(scoreData))
+                    scoreMap[string(infohash)] += score
+                    return nil
+                }); err != nil {
+                    return err
+                }
+            }
+            return nil
+        })
+
+        if err != nil {
+            errorsChan <- err
+            return
+        }
+        scoresChan <- scoreMap
+    }()
+
+    // Wait for results
+    select {
+    case err := <-errorsChan:
+        return nil, err
+    case scoreMap := <-scoresChan:
+        if len(scoreMap) == 0 {
+            return []SearchResult{}, nil
+        }
+
+        // Create sorted results
+        results := make([]QueryResult, 0, len(scoreMap))
+        for infohash, score := range scoreMap {
+            name, files := ParseMetadata(ShowMetadataForInfohash(infohash))
+            results = append(results, QueryResult{
+                SearchResult: SearchResult{
+                    Infohash: infohash,
+                    Name:     name,
+                    Files:    files,
+                },
+                Score: score,
+            })
+        }
+
+        // Sort results by score
+        sort.Slice(results, func(i, j int) bool {
+            return results[i].Score > results[j].Score
+        })
+
+        // Convert to final format
+        finalResults := make([]SearchResult, len(results))
+        for i, r := range results {
+            finalResults[i] = r.SearchResult
+        }
+
+        return finalResults, nil
+    }
 }

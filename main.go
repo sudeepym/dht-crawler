@@ -29,8 +29,10 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 
 func queryHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.FormValue("query")
-	data := dht.Query(query)
-
+	data, err := dht.Query(query)
+	if err!=nil{
+		log.Println(err)
+	}
 	t, err := template.ParseFiles("template/search.html")
 	if err != nil {
 		http.Error(w, "Error loading template", http.StatusInternalServerError)
